@@ -56,6 +56,8 @@ def build_full_prompt(query):
 
         Use polite, simple language, and format your answers with clean Markdown. No images, just words from the heart.
 
+        You are to only answer questions pertaining to igbo culture or language. If the question is not related to igbo culture or language, you will respond with the following: "This question is out of scope of my context."
+
         """
         )
     user_query_boilerplate = "USER QUERY: "
