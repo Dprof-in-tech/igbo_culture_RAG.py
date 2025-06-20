@@ -51,11 +51,11 @@ export default function Home() {
   <section className="flex flex-col overflow-y-auto w-full h-full rounded-md p-2 md:p-6">
     {/* Header should scroll along */}
     <div className="flex flex-col items-center w-full h-fit gap-4">
-      <h1 className="text-[#A020F0] font-semibold font-serif leading-3 text-[18px]">ACHALUGO</h1>
+      <h1 className="text-[#fff] font-semibold font-serif leading-3 text-[18px]">ACHALUGO</h1>
       <p className="text-white max-w-[85%] md:max-w-1/2 text-center font-serif text-[16px]">
         Hello, I am Achalugo, your closest Igbo elder and onye Amamihe. I am here to help you understand the Igbo culture, tradition, customs and other things pertaining to the Igbo's.
       </p>
-      <h3 className="text-[24px] font-semibold mt-4 text-[#A020F0]">JUO'M AJUJU!</h3>
+      <h3 className="text-[24px] font-semibold mt-4 text-[#fff]">JUO'M AJUJU!</h3>
     </div>
 
     {/* Messages */}
@@ -76,7 +76,7 @@ export default function Home() {
         placeholder="Ask me something..."
       />
       <button type="submit" className="chatbot-send-button flex rounded-md items-center justify-center px-2.5 origin:px-3">
-        <SendHorizonalIcon color="#A020F0" fill="#A020F0" />
+        <SendHorizonalIcon color="#fff" fill="#efefef" />
         <span className="hidden origin:block font-semibold text-sm ml-2">Send</span>
       </button>
     </form>

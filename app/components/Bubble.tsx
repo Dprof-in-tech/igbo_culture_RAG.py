@@ -5,7 +5,7 @@ const Bubble:JSXElementConstructor<any> = forwardRef(function Bubble({ content }
   const isLeft = useMemo(() => !content.isQuestion || content.processing, [content]);
 
   return (
-    <div ref={ref  as RefObject<HTMLDivElement>} className={`block mt-4 md:mt-6 pb-[7px] clear-both max-w-[85%]  ${isLeft ? 'float-left bg-[#0E0E0E] px-4 py-3 rounded-t-xl rounded-br-xl' : 'float-right bg-[#A020F0] px-4 py-3 rounded-t-xl rounded-bl-xl'}`}>
+    <div ref={ref  as RefObject<HTMLDivElement>} className={`block mt-4 md:mt-6 pb-[7px] clear-both max-w-[85%]  ${isLeft ? 'float-left bg-[#0E0E0E] px-4 py-3 rounded-t-xl rounded-br-xl' : 'float-right bg-[#232526] px-4 py-3 rounded-t-xl rounded-bl-xl'}`}>
       <div className="flex justify-end">
         <div className={`talk-bubble${isLeft ? ' left' : ''} p-2 md:p-4`}>
           {content.processing ? (
