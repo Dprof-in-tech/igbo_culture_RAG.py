@@ -5,12 +5,11 @@ import logging
 import sys
 from datetime import datetime
 
-# Configure logging
+# Configure logging for serverless (no file logging)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('app.log'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -156,6 +155,7 @@ def fill_and_send_prompt():
             "request_id": request_id
         }), 500
 
+
 # Error handlers
 @app.errorhandler(404)
 def not_found(error):
@@ -180,5 +180,3 @@ def internal_error(error):
         "error": "Internal server error",
         "details": "An unexpected error occurred"
     }), 500
-
-
