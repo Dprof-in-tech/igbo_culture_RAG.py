@@ -10,7 +10,7 @@ class Query(BaseModel):
     prompt: str
 
 
-@app.route("/api/chat")
+@app.route("/api/chat", methods=['POST'])
 def fill_and_send_prompt():
     data = request.get_json()
     prompt = data.get("prompt")
