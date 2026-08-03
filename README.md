@@ -1,299 +1,188 @@
-# 🌍 Achalugo AI - Igbo Cultural RAG System
+# Achalugo — Onye Amamihe
 
-<p align="center">
-  <img src="https://assets.vercel.com/image/upload/v1588805858/repositories/vercel/logo.png" height="96">
-  <h3 align="center">Achalugo AI – Your Intelligent Igbo Cultural Companion</h3>
-</p>
+A retrieval-augmented chat where **Achalugo**, an Igbo elder persona, answers
+questions about Igbo culture, tradition, customs, language and cosmology.
 
-<p align="center">
-  <strong>A sophisticated RAG (Retrieval-Augmented Generation) system that preserves and shares Igbo wisdom, proverbs, traditions, and cultural knowledge through conversational AI.</strong>
-</p>
+Every turn returns a **structured answer** rather than a wall of prose: a short
+direct reply, supporting detail, the Igbo terms used with glosses, the corpus
+documents the answer drew on, and two follow-up questions. Terms accumulate
+into a running glossary for the session.
 
-<p align="center">
-  <a href="#-features">Features</a> •
-  <a href="#-demo">Demo</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-api-documentation">API</a> •
-  <a href="#-contributing">Contributing</a>
-</p>
+**Live:** https://igbo-culture-rag-py.vercel.app
 
 ---
 
-## 🧠 What is Achalugo AI?
+## Architecture
 
-**Achalugo** (meaning "May God's will be done" in Igbo) is an intelligent cultural preservation system that combines modern AI technology with ancient Igbo wisdom. It serves as a digital elder—a warm, knowledgeable companion that can answer questions about Igbo language, proverbs, traditions, customs, and cultural practices.
-
-### 🎯 Mission
-- **Preserve** Igbo cultural knowledge for future generations
-- **Make** traditional wisdom accessible to the diaspora
-- **Bridge** the gap between elders and younger generations
-- **Promote** Igbo language and cultural understanding globally
-
----
-
-## ✨ Features
-
-### 🏛️ Cultural Knowledge Base
-- **5,000+ Igbo Proverbs** with English translations and meanings
-- **Traditional Stories** and folktales with cultural context
-- **Language Learning** support with pronunciation guides
-- **Cultural Practices** explanations for ceremonies and traditions
-- **Historical Context** for Igbo customs and beliefs
-
-### 🤖 Intelligent Conversations
-- **RAG-Powered Responses** using vectorized Igbo cultural content
-- **Contextual Understanding** of cultural nuances and meanings
-- **Multi-language Support** (Igbo, English, and mixed conversations)
-- **Personalized Interactions** that adapt to user's cultural knowledge level
-- **Smart Categorization** of content by themes (wisdom, family, spirituality, etc.)
-
-### 🔍 Advanced Search & Discovery
-- **Semantic Search** through Igbo proverbs and wisdom
-- **Cultural Topic Exploration** with guided conversations
-- **Proverb Recommendations** based on life situations
-- **Historical Context** for cultural practices and beliefs
-
----
-
-## 🎬 Demo
-
-**Live Demo:** [https://igbo-culture-rag-py.vercel.app](https://igbo-culture-rag-py.vercel.app)
-
-### Sample Conversations:
 ```
-User: "Tell me about Igbo proverbs on family"
-Achalugo: "Nwa bu ugwu nne ya - A child is the pride of their mother. 
-This proverb emphasizes how children bring honor and joy to their parents..."
-
-User: "What does 'chi' mean in Igbo culture?"
-Achalugo: "Chi is a fundamental concept in Igbo spirituality representing 
-one's personal god or guiding spirit. It's believed that everyone has a chi..."
+app/  (Next.js, client)                  api/  (Flask, serverless)
+┌──────────────────────┐                 ┌───────────────────────────────┐
+│ Transcript           │  POST /api/chat │ index.py    validate, route   │
+│ Composer             │ ──────────────▶ │ routes/chat.py                │
+│ Glossary (derived)   │                 │   1. embed question           │
+│                      │ ◀────────────── │   2. top-k from AstraDB       │
+└──────────────────────┘  answer object  │   3. compose JSON answer      │
+                                         │   4. map cited passages back  │
+                                         │      to real source metadata  │
+                                         └───────────────────────────────┘
 ```
 
+`api/config.py` builds the embedding model and vector store for **both** the
+serving path and the ingestion pipeline, so the write side and the read side
+cannot drift onto different collections or dimensions.
+
+### Tech
+
+| Layer | What |
+| --- | --- |
+| Frontend | Next.js 13 App Router, TypeScript, Tailwind, Playfair Display + Work Sans |
+| Backend | Flask, deployed as a Vercel Python function |
+| Retrieval | AstraDB vector store via `langchain-astradb` |
+| Models | OpenAI `text-embedding-3-small` (1536d), `gpt-4o-mini` for answers and ingestion |
+
 ---
 
-## 🚀 Quick Start
+## API
 
-### Prerequisites
-- **Node.js** 18+ and npm/yarn
-- **Python** 3.8+ with pip
-- **OpenAI API Key** for embeddings and chat
-- **AstraDB Account** for vector storage
+### `POST /api/chat`
 
-### 1. Clone & Install
+```json
+{
+  "prompt": "Why do we break kola nut, and who may break it?",
+  "history": [{ "role": "user", "content": "..." },
+              { "role": "assistant", "content": "..." }]
+}
+```
+
+`history` is optional; the client sends the last 6 turns.
+
+**Response**
+
+```json
+{
+  "answer": "1–2 sentence direct answer in Achalugo's voice",
+  "detail": "2–4 sentences of depth",
+  "terms":   [{ "term": "ọjị", "meaning": "kola nut" }],
+  "sources": [{ "title": "Kola nut", "note": "role of kola in Igbo hospitality",
+                "url": "https://en.wikipedia.org/wiki/Kola_nut" }],
+  "followups": ["What words are said when breaking kola?", "May a woman break it?"],
+  "request_id": "a1b2c3d4e5f6"
+}
+```
+
+`detail`, `terms`, `sources` and `followups` are each optional — the UI renders
+correctly when any subset is absent.
+
+**`sources` are real retrieved documents.** The model is shown numbered
+passages and asked which ones it leaned on; those indices are mapped back to
+corpus metadata server-side. The model never writes a citation itself.
+
+Failures return HTTP 500 but still carry a renderable in-character `answer`, so
+the UI never has to show error chrome.
+
+### `GET /api/health`
+
+Reports whether the function can reach its config and its collection, and
+whether that collection has any documents in it.
+
+---
+
+## Quick start
+
 ```bash
 git clone https://github.com/Dprof-in-tech/igbo_culture_RAG.py.git
 cd igbo_culture_RAG.py
 
-# Install frontend dependencies
-npm install
+pnpm install
+pip install -r requirements.txt -r requirements-ingest.txt
 
-# Install Python dependencies
-pip install -r requirements.txt
+cp .env.example .env      # then fill it in
 ```
 
-### 2. Environment Setup
+Build the corpus (see below), then:
+
 ```bash
-cp .env.example .env
+pnpm dev     # Next on :3000, Flask on :5328
 ```
 
-Fill in your environment variables:
-```env
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
+---
 
-# AstraDB Vector Database
-ASTRA_DB_APPLICATION_TOKEN=your_astra_token
-ASTRA_DB_API_ENDPOINT=your_astra_endpoint
-ASTRA_DB_KEYSPACE_NAME=your_keyspace
-ASTRA_DB_COLLECTION_NAME=igbo_wisdom
+## Corpus
+
+The index is built by `api/ingest`, a four-stage pipeline over a registry of
+**107 sources** — English and Igbo Wikipedia, Wikiquote, Britannica, and a set
+of Igbo proverb and culture sites.
+
+```
+sources.py → fetch.py → extract.py → load.py
+ registry    plaintext   LLM pass     chunk, embed, write
 ```
 
-### 3. Initialize Knowledge Base
+1. **Fetch.** Wikipedia and Wikiquote come through the MediaWiki API as clean
+   plaintext, which is far better material than scraping rendered HTML. Other
+   pages are fetched and reduced to text. Missing articles and dead links are
+   logged and skipped.
+2. **Extract.** Each ~3.5k-character chunk goes through `gpt-4o-mini` once and
+   comes back as self-contained passages carrying a topic, a summary, a kind
+   (`proverb`, `custom`, `history`, `language`, `cosmology`, `arts`, `food`)
+   and the Igbo terms they use. Those terms are what feed the UI's glossary,
+   and the summaries are what feed the "Ebe o si" source notes.
+3. **Load.** Passages are embedded with their Igbo terms appended, so a
+   question asked in Igbo lands on a passage whose body is mostly English.
+   Document ids are content hashes, so re-running **overwrites rather than
+   duplicates** — the corpus can be grown incrementally.
+
+### Running it
+
 ```bash
-# Scrape and vectorize Igbo cultural content
-python api/integrate.py #only do this if you are running this RAG locally
-
-# This will populate your vector database with:
-# - Igbo proverbs and meanings
-# - Cultural stories and traditions
-# - Language learning content
-# - Historical and spiritual knowledge
+python3 -m api.ingest                  # full run
+python3 -m api.ingest --dry-run        # fetch + extract, write nothing
+python3 -m api.ingest --only proverbs  # one tag (repeatable)
+python3 -m api.ingest --limit 5        # first N sources, smoke test
+python3 -m api.ingest --no-llm         # skip the extraction pass (free, noisier)
+python3 -m api.ingest --refresh        # ignore the fetch cache
+python3 -m api.ingest --collection x   # write somewhere other than the env default
 ```
 
-### 4. Start Development Servers
-```bash
+Fetches and extractions are cached under `.cache/ingest/`, keyed by source and
+by content hash. Re-runs cost no network and no OpenAI tokens for anything
+unchanged, and interrupting a run loses nothing.
 
+### Adding sources
 
-# Start Next.js frontend and Python backend
-npm run dev
-# Runs on http://localhost:3000
-```
-
-### 5. Start Chatting! 🗣️
-Open [http://localhost:3000](http://localhost:3000) and start exploring Igbo culture with Achalugo!
+Add entries to the appropriate group in `api/ingest/sources.py`. MediaWiki
+titles resolve through redirects, so a near-miss title usually still lands —
+it is worth listing a speculative article rather than leaving a gap.
 
 ---
 
-## 🏗️ Architecture
+## Deployment
 
-### Tech Stack
-- **Frontend:** Next.js 14, TypeScript, Tailwind CSS
-- **Backend:** Flask (Python), RESTful API
-- **AI/ML:** OpenAI GPT-4, Text Embeddings
-- **Vector Database:** AstraDB with semantic search
-- **Deployment:** Vercel (Frontend + Serverless Functions)
+Vercel serves the Next.js app and `api/index.py` as a Python function;
+`vercel.json` routes `/api/*` into it. `requirements.txt` holds only what the
+function needs at request time — scraping dependencies live in
+`requirements-ingest.txt` and never enter the bundle.
 
-### System Flow
-```mermaid
-graph TD
-    A[User Question] --> B[Next.js Frontend]
-    B --> C[Flask API]
-    C --> D[RAG System]
-    D --> E[Vector Search - AstraDB]
-    D --> F[Cultural Context Extraction]
-    E --> G[Relevant Igbo Content]
-    F --> G
-    G --> H[OpenAI GPT-4]
-    H --> I[Culturally-Aware Response]
-    I --> B
-    B --> J[User Interface]
-```
-
-### RAG Pipeline
-1. **Query Processing:** Extract cultural context and intent
-2. **Vector Search:** Find relevant Igbo proverbs, stories, traditions
-3. **Context Assembly:** Organize cultural knowledge by relevance
-4. **Response Generation:** Generate culturally-aware, respectful responses
-5. **Cultural Validation:** Ensure accuracy and cultural sensitivity
+Set every variable from `.env.example` in the Vercel project. Ingestion is run
+locally, not on Vercel.
 
 ---
 
-## 🔌 API Documentation
+## Design
 
-### Chat Endpoints
+The interface follows the approved *editorial paper* direction: terracotta and
+saffron on paper, Playfair Display for Achalugo's voice and Work Sans for
+everything else, square edges throughout (the sole exception is the follow-up
+pills), and no shadows — depth comes from 1px rules only. Desktop and mobile
+are two discrete layouts that switch at 820px.
 
-#### `POST /api/chat`
-Send a message to Achalugo and get a culturally-informed response.
-
-**Request:**
-```json
-{
-  "message": "Tell me about Igbo naming traditions",
-  "context": {
-    "user_id": "optional_user_id",
-    "conversation_id": "optional_conversation_id"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "response": "In Igbo culture, names carry deep meaning and spiritual significance...",
-  "cultural_context": [
-    {
-      "type": "tradition",
-      "title": "Igbo Naming Ceremonies",
-      "relevance": 0.95
-    }
-  ],
-  "proverbs": [
-    {
-      "igbo": "Aha onye na-eme ya",
-      "english": "One's name makes them who they are",
-      "context": "naming_significance"
-    }
-  ],
-  "conversation_id": "conv_123456789"
-}
-```
+Igbo diacritics (`ị ụ ọ`) live in the Vietnamese Unicode block, so both fonts
+load that subset — without it those characters fall back mid-word to a system
+font.
 
 ---
 
-## 🗄️ Knowledge Base
+## License
 
-### Content Sources
-- **Traditional Igbo Proverbs** from cultural websites and books
-- **Folklore and Stories** from Igbo oral tradition
-- **Cultural Practices** documentation from anthropological sources
-- **Language Resources** from Igbo language learning materials
-- **Historical Records** from academic and cultural institutions
-
-
-### Vector Database Schema
-```python
-{
-  "igbo_text": "Original Igbo content",
-  "english_meaning": "English translation/explanation",
-  "categories": ["wisdom", "family", "spiritual"],
-  "cultural_context": "Deep cultural significance",
-  "source": "Attribution information",
-  "verified": true,
-  "embedding": [vector_representation]
-}
-```
-
----
-
-## 🚀 Deployment
-
-### Deploy to Vercel (Recommended)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?demo-title=Achalugo%20AI&demo-description=Igbo%20Cultural%20RAG%20System&demo-url=https%3A%2F%2Fachalugo-ai.vercel.app&project-name=achalugo-ai&repository-name=achalugo-ai)
-
-### Manual Deployment
-```bash
-# Build the application
-npm run build
-
-# Deploy to Vercel
-npx vercel --prod
-
-# Set environment variables in Vercel dashboard
-# Add your OpenAI API key and AstraDB credentials
-```
-
-### Production Configuration
-- Set up monitoring for API usage and performance
-- Configure rate limiting for API endpoints
-- Enable logging for cultural content interactions
-- Set up backup strategies for the knowledge base
-
----
-
-
-
-## 🛡️ Privacy & Cultural Ethics
-
-### Data Protection
-- **User Privacy:** No personal cultural conversations are stored permanently
-- **Cultural Sensitivity:** Respect for sacred and private cultural elements
-- **Community Consent:** Traditional knowledge shared with community approval
-
-### Cultural Respect
-- **Sacred Content:** Certain traditional knowledge requires special handling
-- **Elder Approval:** Major cultural additions reviewed by community elders
-- **Inclusive Representation:** Fair representation of all Igbo communities
-
-
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-**Cultural Content:** Traditional Igbo knowledge is shared with respect and attribution to its community origins. All cultural content remains the intellectual property of the Igbo people and their cultural heritage.
-
-
----
-
-<p align="center">
-  <strong>Achalugo AI - Bridging Ancient Wisdom with Modern Technology</strong><br>
-  <em>Preserving Igbo culture for future generations through intelligent conversation</em>
-</p>
-
-<p align="center">
-  Made with ❤️ for the Igbo community and cultural preservation worldwide
-</p>
+MIT. Traditional Igbo knowledge in the corpus is shared with attribution to its
+community origins and remains the cultural heritage of the Igbo people.

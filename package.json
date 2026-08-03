@@ -1,14 +1,16 @@
 {
-  "name": "next-flask",
-  "version": "0.1.0",
+  "name": "achalugo",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "flask-dev": "FLASK_DEBUG=1 pip3 install -r requirements.txt && python3 -m flask --app api/index run -p 5328",
     "next-dev": "next dev",
     "dev": "concurrently \"pnpm run next-dev\" \"pnpm run flask-dev\"",
+    "ingest": "python3 -m api.ingest",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@types/node": "20.1.4",
@@ -19,8 +21,6 @@
     "concurrently": "^8.0.1",
     "eslint": "8.40.0",
     "eslint-config-next": "13.4.2",
-    "immutability-helper": "^3.1.1",
-    "lucide-react": "^0.513.0",
     "next": "13.4.3",
     "postcss": "8.4.23",
     "react": "18.2.0",

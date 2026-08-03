@@ -1,4 +1,9 @@
+# Serving dependencies. This is what Vercel installs for the serverless
+# function, so keep it to what /api/chat needs at request time. Ingestion-only
+# dependencies live in requirements-ingest.txt.
 Flask==3.0.3
-langchain>=0.3,<0.4
-langchain-astradb>=0.6,<0.7
+python-dotenv>=1.0,<2
+pydantic>=2.7,<3
+langchain-core>=0.3,<0.4
 langchain-openai>=0.3,<0.4
+langchain-astradb>=0.6,<0.7

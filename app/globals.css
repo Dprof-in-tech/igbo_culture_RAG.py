@@ -2,26 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+  /* Desk tone sits behind the app frame; not visible in the full-viewport app. */
+  body {
+    background: theme('colors.desk');
+    color: theme('colors.ink');
+    font-family: theme('fontFamily.sans');
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: theme('colors.terracotta.DEFAULT');
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: theme('colors.terracotta.dark');
+    text-decoration: underline;
+  }
+
+  input,
+  button,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  ::placeholder {
+    color: rgba(30, 27, 24, 0.38);
   }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+@layer utilities {
+  /* Fine terracotta hatch standing in for uzo/nsibidi line work. */
+  .motif-band {
+    background-image: repeating-linear-gradient(
+      135deg,
+      theme('colors.terracotta.DEFAULT') 0 2px,
+      transparent 2px 9px
+    );
+    opacity: 0.8;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

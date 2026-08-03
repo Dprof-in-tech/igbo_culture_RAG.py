@@ -25,7 +25,14 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
 .env*.local
+
+# ingestion fetch/extraction cache
+.cache/
+
+# design handoff bundle
+*.zip
 
 # vercel
 .vercel

@@ -1,21 +1,38 @@
-import './globals.css'
-import { Inter } from 'next/font/google'
+import './globals.css';
+import { Playfair_Display, Work_Sans } from 'next/font/google';
 
-const inter = Inter({ subsets: ['latin'] })
+// The vietnamese subset carries the Igbo dotted vowels (ị ụ ọ). Without it they
+// fall back mid-word to a system font.
+const playfair = Playfair_Display({
+  subsets: ['latin', 'latin-ext', 'vietnamese'],
+  weight: ['500', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-playfair',
+  display: 'swap',
+});
+
+const workSans = Work_Sans({
+  subsets: ['latin', 'latin-ext', 'vietnamese'],
+  weight: ['300', '400', '500', '600'],
+  variable: '--font-work-sans',
+  display: 'swap',
+});
 
 export const metadata = {
-  title: 'ACHALUGO AI',
-  description: 'Hello, my dear! I am Achalugo, an Igbo Woman who is deeply rooted in our culture. I am here to share my knowledge and wisdom with you!',
-}
+  title: 'Achalugo — Onye Amamihe',
+  description:
+    'Hello, I am Achalugo, your closest Igbo elder and onye Amamihe. I am here to help you understand Igbo culture, tradition and customs.',
+  themeColor: '#F5EFE4',
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="en" className={`${playfair.variable} ${workSans.variable}`}>
+      <body className="font-sans">{children}</body>
     </html>
-  )
+  );
 }

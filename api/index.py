@@ -1,182 +1,152 @@
-from flask import Flask, request, jsonify
-from pydantic import BaseModel, ValidationError
-import traceback
+"""Flask entrypoint for the Achalugo RAG API."""
+
+from __future__ import annotations
+
 import logging
 import sys
-from datetime import datetime
+import uuid
 
-# Configure logging for serverless (no file logging)
+from flask import Flask, jsonify, request
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# In-character failure text, mirroring the client's own fallback so a server
+# error still reads as Achalugo rather than as an error page.
+VOICE_FAILURE = (
+    "Forgive me, nwa m — my voice did not carry just then. "
+    "Juo’m ajuju ọzọ, ask me again."
+)
+
+
+class Turn(BaseModel):
+    role: str
+    content: str
+
+
 class Query(BaseModel):
-    prompt: str
+    prompt: str = Field(min_length=1, max_length=2000)
+    history: list[Turn] = Field(default_factory=list)
 
-# Import with error handling
-try:
-    from api.routes.chat import (
-        build_full_prompt,
-        send_to_openai
-    )
-    logger.info("Successfully imported chat functions")
-except ImportError as e:
-    logger.error(f"Failed to import chat functions: {e}")
-    build_full_prompt = None
-    send_to_openai = None
+    @field_validator("prompt")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("prompt must not be blank")
+        return stripped
 
-@app.route("/api/chat", methods=['POST'])
-def fill_and_send_prompt():
-    request_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    logger.info(f"[{request_id}] Starting chat request")
-    
+
+def _handle_chat():
+    request_id = uuid.uuid4().hex[:12]
+
     try:
-        # Step 1: Check if functions are available
-        if build_full_prompt is None or send_to_openai is None:
-            logger.error(f"[{request_id}] Chat functions not imported properly")
-            return jsonify({
-                "error": "Server configuration error",
-                "details": "Chat functions not available",
-                "request_id": request_id
-            }), 500
-        
-        # Step 2: Check if request has JSON data
-        if not request.is_json:
-            logger.error(f"[{request_id}] Request is not JSON")
-            return jsonify({
-                "error": "Invalid request format",
-                "details": "Request must be JSON",
-                "request_id": request_id
-            }), 400
-        
-        # Step 3: Get and validate request data
-        try:
-            data = request.get_json()
-            logger.info(f"[{request_id}] Received data: {data}")
-        except Exception as e:
-            logger.error(f"[{request_id}] Failed to parse JSON: {e}")
-            return jsonify({
-                "error": "JSON parsing error",
-                "details": str(e),
-                "request_id": request_id
-            }), 400
-        
-        # Step 4: Extract prompt
-        if not data:
-            logger.error(f"[{request_id}] No data received")
-            return jsonify({
-                "error": "No data provided",
-                "details": "Request body is empty",
-                "request_id": request_id
-            }), 400
-        
-        prompt = data.get("prompt")
-        if not prompt:
-            logger.error(f"[{request_id}] No prompt in request data")
-            return jsonify({
-                "error": "Missing prompt",
-                "details": "Request must include 'prompt' field",
-                "request_id": request_id
-            }), 400
-        
-        if not isinstance(prompt, str):
-            logger.error(f"[{request_id}] Prompt is not a string: {type(prompt)}")
-            return jsonify({
-                "error": "Invalid prompt type",
-                "details": f"Prompt must be a string, got {type(prompt).__name__}",
-                "request_id": request_id
-            }), 400
-        
-        # Step 5: Validate with Pydantic
-        try:
-            query = Query(prompt=prompt)
-            logger.info(f"[{request_id}] Prompt validated: '{prompt[:100]}...'")
-        except ValidationError as e:
-            logger.error(f"[{request_id}] Pydantic validation error: {e}")
-            return jsonify({
-                "error": "Validation error",
-                "details": str(e),
-                "request_id": request_id
-            }), 400
-        
-        # Step 6: Build full prompt
-        try:
-            logger.info(f"[{request_id}] Building full prompt...")
-            docs = build_full_prompt(prompt)
-            logger.info(f"[{request_id}] Full prompt built successfully. Length: {len(str(docs)) if docs else 0}")
-        except Exception as e:
-            logger.error(f"[{request_id}] Error in build_full_prompt: {e}")
-            logger.error(f"[{request_id}] Traceback: {traceback.format_exc()}")
-            return jsonify({
-                "error": "Prompt building error",
-                "details": str(e),
-                "function": "build_full_prompt",
-                "request_id": request_id
-            }), 500
-        
-        # Step 7: Send to OpenAI
-        try:
-            logger.info(f"[{request_id}] Sending to OpenAI...")
-            response = send_to_openai(docs)
-            logger.info(f"[{request_id}] OpenAI response received. Length: {len(str(response)) if response else 0}")
-        except Exception as e:
-            logger.error(f"[{request_id}] Error in send_to_openai: {e}")
-            logger.error(f"[{request_id}] Traceback: {traceback.format_exc()}")
-            return jsonify({
-                "error": "OpenAI API error", 
-                "details": str(e),
-                "function": "send_to_openai",
-                "request_id": request_id
-            }), 500
-        
-        # Step 8: Return successful response
-        logger.info(f"[{request_id}] Request completed successfully")
-        return jsonify({
-            "text": response,
-            "request_id": request_id,
-            "status": "success"
-        })
-    
-    except Exception as e:
-        # Catch-all error handler
-        logger.error(f"[{request_id}] Unexpected error: {e}")
-        logger.error(f"[{request_id}] Full traceback: {traceback.format_exc()}")
-        return jsonify({
-            "error": "Internal server error",
-            "details": str(e),
-            "traceback": traceback.format_exc(),
-            "request_id": request_id
-        }), 500
+        query = Query.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        logger.warning("[%s] Invalid request: %s", request_id, exc)
+        # include_context=False matters: a custom validator's ctx carries the
+        # raw ValueError, which jsonify cannot serialise. include_input=False
+        # keeps the caller's payload out of the response.
+        details = exc.errors(
+            include_url=False, include_context=False, include_input=False
+        )
+        return (
+            jsonify(
+                {
+                    "error": "Invalid request",
+                    "details": details,
+                    "request_id": request_id,
+                }
+            ),
+            400,
+        )
+
+    logger.info("[%s] Question: %.120s", request_id, query.prompt)
+
+    try:
+        # Imported here so a missing credential surfaces as a handled 500 with a
+        # useful log line rather than killing the whole module at import time.
+        from api.routes.chat import answer_question
+
+        payload = answer_question(
+            query.prompt,
+            [turn.model_dump() for turn in query.history],
+        )
+    except Exception:
+        logger.exception("[%s] Failed to answer", request_id)
+        return (
+            jsonify(
+                {
+                    "answer": VOICE_FAILURE,
+                    "detail": "",
+                    "terms": [],
+                    "sources": [],
+                    "followups": [],
+                    "error": "Answer generation failed",
+                    "request_id": request_id,
+                }
+            ),
+            500,
+        )
+
+    logger.info(
+        "[%s] Answered with %d source(s), %d term(s)",
+        request_id,
+        len(payload["sources"]),
+        len(payload["terms"]),
+    )
+    payload["request_id"] = request_id
+    return jsonify(payload)
 
 
-# Error handlers
+# Registered on both paths: Vercel may or may not preserve the `/api` prefix
+# when it routes into this function, depending on the rewrite in play.
+app.add_url_rule("/api/chat", view_func=_handle_chat, methods=["POST"])
+app.add_url_rule("/chat", view_func=_handle_chat, methods=["POST"], endpoint="chat_bare")
+
+
+@app.route("/api/health", methods=["GET"])
+@app.route("/health", methods=["GET"], endpoint="health_bare")
+def health():
+    """Reports whether the app can reach its config and its index."""
+    try:
+        from api.config import COLLECTION_NAME, get_vector_store
+
+        # Deliberately not via routes.chat.retrieve, which swallows failures.
+        hits = get_vector_store().similarity_search("kola nut", k=1)
+        return jsonify(
+            {
+                "status": "ok",
+                "collection": COLLECTION_NAME,
+                "index_reachable": True,
+                "index_has_documents": bool(hits),
+            }
+        )
+    except Exception as exc:
+        logger.exception("Health check failed")
+        return jsonify({"status": "error", "details": str(exc)}), 500
+
+
 @app.errorhandler(404)
-def not_found(error):
-    return jsonify({
-        "error": "Not found",
-        "details": "The requested endpoint does not exist",
-        "path": request.path
-    }), 404
+def not_found(_error):
+    return jsonify({"error": "Not found", "path": request.path}), 404
+
 
 @app.errorhandler(405)
-def method_not_allowed(error):
-    return jsonify({
-        "error": "Method not allowed",
-        "details": f"Method {request.method} not allowed for {request.path}",
-        "allowed_methods": ["POST"]
-    }), 405
-
-@app.errorhandler(500)
-def internal_error(error):
-    logger.error(f"500 error: {error}")
-    return jsonify({
-        "error": "Internal server error",
-        "details": "An unexpected error occurred"
-    }), 500
+def method_not_allowed(_error):
+    return (
+        jsonify(
+            {
+                "error": "Method not allowed",
+                "details": f"{request.method} is not allowed for {request.path}",
+            }
+        ),
+        405,
+    )
