@@ -74,7 +74,8 @@ def to_documents(entries: list[Entry]) -> tuple[list, list[str]]:
 def write(documents: list, ids: list[str], collection: str | None = None) -> int:
     from api.config import get_vector_store
 
-    store = get_vector_store(collection)
+    # create=True: ingestion is where the collection is brought into existence.
+    store = get_vector_store(collection, create=True)
     written = 0
     for start in range(0, len(documents), BATCH):
         batch_docs = documents[start : start + BATCH]

@@ -61,9 +61,22 @@ def get_embeddings():
     )
 
 
-@lru_cache(maxsize=1)
-def get_vector_store(collection_name: str | None = None):
+@lru_cache(maxsize=2)
+def get_vector_store(collection_name: str | None = None, create: bool = False):
+    """The corpus vector store.
+
+    `create` must stay False on the serving path. AstraDBVectorStore's default
+    setup mode issues a create_collection on every init, which is wrong here in
+    two ways: it is a write call on a read path (it costs a round trip on every
+    cold start, and it is what fails when the Data API is unreachable), and it
+    silently conjures an *empty* collection when the configured name is wrong,
+    turning a misconfiguration into "no sources" instead of a loud error.
+
+    Ingestion passes create=True, because that is where the collection should
+    come into existence.
+    """
     from langchain_astradb import AstraDBVectorStore
+    from langchain_astradb.utils.astradb import SetupMode
 
     return AstraDBVectorStore(
         collection_name=collection_name or COLLECTION_NAME,
@@ -71,6 +84,7 @@ def get_vector_store(collection_name: str | None = None):
         token=_required("ASTRA_DB_APPLICATION_TOKEN"),
         api_endpoint=_required("ASTRA_DB_API_ENDPOINT"),
         namespace=_required("ASTRA_DB_KEYSPACE_NAME"),
+        setup_mode=SetupMode.SYNC if create else SetupMode.OFF,
     )
 
 

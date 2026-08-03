@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any, Iterable
 
 from api.config import RETRIEVAL_K, get_chat_model, get_vector_store
@@ -48,14 +49,49 @@ Rules: 1-4 terms, at most 3 passage_ids, exactly 2 followups. "passage_ids" must
 # --- Retrieval --------------------------------------------------------------
 
 
+RETRIEVAL_ATTEMPTS = 3
+RETRIEVAL_BACKOFF = 0.4
+
+
 def retrieve(query: str, k: int = RETRIEVAL_K) -> list:
-    """Top-k corpus documents for a query. Never raises — an empty index or a
-    transient Astra failure degrades to an unsourced answer rather than a 500."""
-    try:
-        return get_vector_store().similarity_search(query, k=k)
-    except Exception:
-        logger.exception("Retrieval failed; answering without corpus context")
-        return []
+    """Top-k corpus documents for a query.
+
+    Never raises: an unreachable index degrades to an unsourced answer rather
+    than a 500. Connection-level failures are retried, because a serverless
+    cold start can hit a transient socket error reaching the Data API — the
+    kind that succeeds immediately on a second try. Errors the API actually
+    responded with (a missing collection, a bad token) are not retried, since
+    repeating them only burns the request's time budget.
+    """
+    import httpx
+
+    transient = (
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+        httpx.RemoteProtocolError,
+    )
+
+    for attempt in range(RETRIEVAL_ATTEMPTS):
+        try:
+            return get_vector_store().similarity_search(query, k=k)
+        except transient as exc:
+            last = attempt == RETRIEVAL_ATTEMPTS - 1
+            logger.warning(
+                "Retrieval connection error (%d/%d): %s",
+                attempt + 1,
+                RETRIEVAL_ATTEMPTS,
+                exc,
+            )
+            if last:
+                logger.error("Retrieval unreachable; answering without corpus context")
+                return []
+            time.sleep(RETRIEVAL_BACKOFF * (2**attempt))
+        except Exception:
+            logger.exception("Retrieval failed; answering without corpus context")
+            return []
+
+    return []
 
 
 def _passage_title(metadata: dict) -> str:
